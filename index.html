@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SUE HAPPY ANNIVERSARY</title>
+    <meta name="description" content="一张给 SUE 的互动生日电子贺卡。" />
+    <link rel="icon" href="public/favicon.svg" />
+    <link rel="stylesheet" href="app/globals.css?v=20260702-sue-kirby" />
+  </head>
+  <body>
+    <main class="birthday-page particle-page" id="birthdayPage">
+      <header class="birthday-topbar" aria-label="Card context">
+        <span class="brand-mark">For SUE</span>
+        <button class="sound-toggle" id="sound-toggle" type="button" aria-pressed="true" aria-label="暂停背景音乐" title="Coldplay - Yellow">
+          <svg class="sound-icon-note" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 18.2V7.2l9-1.8v10.2"></path>
+            <circle cx="7.5" cy="18.2" r="2.4"></circle>
+            <circle cx="16.5" cy="16.4" r="2.4"></circle>
+          </svg>
+          <svg class="sound-icon-muted" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4.5 14.5h3.4l4.3 3.4V6.1L7.9 9.5H4.5z"></path>
+            <path d="M15.5 9.5l4.5 5"></path>
+            <path d="M20 9.5l-4.5 5"></path>
+          </svg>
+          <span class="sr-only">切换背景音乐</span>
+        </button>
+      </header>
+
+      <section class="particle-stage" data-mode="cake" aria-label="SUE birthday scene" id="particleStage">
+        <canvas class="particle-canvas" id="particleCanvas"></canvas>
+        <div class="star-orbit" data-mode="cake" aria-hidden="true" id="starOrbit">
+          <div class="wish-cloud" id="wishCloud" aria-live="polite"></div>
+        </div>
+        <div class="particle-copy">
+          <p class="cover-kicker">SUE</p>
+          <h1>
+            <span class="hero-birthday">Happy Birthday</span>
+            <span class="hero-greeting">HAPPY ANNIVERSARY</span>
+          </h1>
+        </div>
+      </section>
+
+      <section class="wish-panel" aria-live="polite">
+        <form class="wish-console" id="wishForm">
+          <div class="wish-field">
+            <label for="nickname">昵称</label>
+            <input id="nickname" maxlength="18" placeholder="你的昵称" />
+          </div>
+          <div class="wish-field">
+            <label for="wish">祝福</label>
+            <textarea id="wish" maxlength="64" placeholder="写一句祝福"></textarea>
+          </div>
+          <div class="wish-submit-row">
+            <p class="wish-note" id="wishNote">&nbsp;</p>
+            <button class="primary-action" type="submit">送出祝福</button>
+          </div>
+        </form>
+      </section>
+
+    </main>
+    <audio
+      class="ambient-audio"
+      id="ambient-audio"
+      autoplay
+      loop
+      preload="auto"
+      aria-hidden="true"
+    >
+      <source
+        src="./Coldplay%20-%20Yellow%20%28Official%20Video%29.mp3"
+        type="audio/mpeg"
+      />
+    </audio>
+
+    <script>
+      const cardConfig = {
+        celebrantNames: ["SUE"],
+        birthdayLine: "Happy Birthday",
+        greetingLine: "HAPPY ANNIVERSARY",
+        localWishStorageKey: "sue-birthday-wishes",
+        avatarFolder: "kirby",
+        avatarFiles: [
+          "340-3401880_kirby-nintendo-kirby.png",
+          "kirby-transparent-background-9.jpg",
+          "Kirby-Free-PNG-Image.png",
+          "Kirby-Transparent.png",
+          "61-613755_47-images-about-png-on-we-heart-it.png",
+          "Kirby-PNG.png",
+          "333-3334400_kirby-sprite-transparent-kirby-angry-png.png",
+          "kirby-transparent-background-13.jpg",
+          "140-1406663_kirby-has-a-very-special-message-for-you.png",
+          "kirby-transparent-background-12.jpg",
+          "kirby-transparent-background-11.jpg",
+          "kirby-transparent-background-20.jpg",
+          "Kirby-PNG-Image.png",
+          "333-3334084_kirby-sprite-illustration.png",
+          "kirby-transparent-background-19.jpg",
+          "kirby-transparent-background-25.jpg",
+          "44-442147_spider-is-one-of-kirbys-copy-abilities-first.jpg",
+          "Kirby.png",
+          "kirby-transparent-background-18.jpg",
+          "395-3957700_download-zip-archive-kirby-t-pose-model.png",
+          "kirby-transparent-background-6.jpg",
+          "kirby-transparent-background-7.jpg",
+          "Kirby-Free-Download-PNG.png",
+          "271-2718956_kirby-nintendo.png",
+          "kirby-transparent-background-1.jpg",
+          "kirby-transparent-background-3.jpg",
+          "Biarpy4BT.png",
+          "Kirby-PNG-Picture.png",
+        ],
+      };
+      const celebrantLabel = cardConfig.celebrantNames.join(" | ");
+      const celebrantDescription = `一张给 ${celebrantLabel} 的互动生日电子贺卡。`;
+
+      const page = document.getElementById("birthdayPage");
+      const stage = document.getElementById("particleStage");
+      const canvas = document.getElementById("particleCanvas");
+      const ctx = canvas.getContext("2d");
+      const starOrbit = document.getElementById("starOrbit");
+      const wishCloud = document.getElementById("wishCloud");
+      const wishForm = document.getElementById("wishForm");
+      const nickname = document.getElementById("nickname");
+      const wish = document.getElementById("wish");
+      const wishNote = document.getElementById("wishNote");
+      const soundToggle = document.getElementById("sound-toggle");
+      const ambientAudio = document.getElementById("ambient-audio");
+      const brandMark = document.querySelector(".brand-mark");
+      const coverKicker = document.querySelector(".cover-kicker");
+      const heroBirthday = document.querySelector(".hero-birthday");
+      const heroGreeting = document.querySelector(".hero-greeting");
+      const pageDescription = document.querySelector('meta[name="description"]');
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      const previewStill = new URLSearchParams(window.location.search).has("preview");
+      const tau = Math.PI * 2;
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      const storedWishLimit = 200;
+      const maxVisibleWishCount = storedWishLimit;
+      const rotation = {
+        x: -0.18,
+        y: 0.34,
+        targetX: -0.18,
+        targetY: 0.34,
+        scale: 1,
+        targetScale: 1,
+      };
+      const drag = {
+        active: false,
+        moved: false,
+        startX: 0,
+        startY: 0,
+        startTime: 0,
+        lastX: 0,
+        lastY: 0,
+        pointerId: -1,
+        suppressClick: false,
+        lastTapAt: 0,
+      };
+      let mode = "cake";
+      let width = 0;
+      let height = 0;
+      let unit = 0;
+      let initialized = false;
+      let wishes = [];
+      let isAmbientMusicOn = true;
+      let hasAutoplayRetryBound = false;
+
+      document.title = `${celebrantLabel} ${cardConfig.greetingLine}`;
+      brandMark.textContent = `For ${celebrantLabel}`;
+      coverKicker.textContent = celebrantLabel;
+      heroBirthday.textContent = cardConfig.birthdayLine;
+      heroGreeting.textContent = cardConfig.greetingLine;
+      stage.setAttribute("aria-label", `${celebrantLabel} birthday scene`);
+      pageDescription?.setAttribute("content", celebrantDescription);
+
+      const wishAvatarPaths = cardConfig.avatarFiles.map(
+        (file) => `${cardConfig.avatarFolder}/${encodeURIComponent(file)}`,
+      );
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function pseudo(seed) {
+        const value = Math.sin(seed * 127.1 + 311.7) * 43758.5453123;
+        return value - Math.floor(value);
+      }
+
+      const particles = Array.from({ length: 1280 }, (_, index) => ({
+        x: 0,
+        y: 0,
+        z: 0,
+        tx: 0,
+        ty: 0,
+        tz: 0,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        size: 0.8 + pseudo(index + 4) * 1.75,
+        targetSize: 0.8 + pseudo(index + 4) * 1.75,
+        drift: pseudo(index + 23) * tau,
+        color:
+          index % 7 === 0
+            ? "#f0d47b"
+            : index % 7 === 1
+              ? "#fff5cd"
+              : index % 7 === 2
+                ? "#4fa38b"
+                : index % 7 === 3
+                  ? "#d65b54"
+                  : index % 7 === 4
+                    ? "#7f9cff"
+                    : "#f7f4ec",
+      }));
+
+      function cylinderPoint(seed, radiusX, radiusZ, topY, bottomY, color, shell = 0.46) {
+        const angle = seed * goldenAngle + pseudo(seed + 1) * 0.34;
+        const radial = Math.pow(pseudo(seed + 2), shell);
+        return {
+          x: Math.cos(angle) * radiusX * radial,
+          y: topY + (bottomY - topY) * pseudo(seed + 3),
+          z: Math.sin(angle) * radiusZ * radial,
+          color,
+          size: 1.1 + pseudo(seed + 5) * 1.4,
+        };
+      }
+
+      function cakePoint(index, total) {
+        const t = index / total;
+        const seed = index + 17;
+        const bodyRed = index % 5 === 0 ? "#f4c66d" : "#d65b54";
+        const cream = index % 4 === 0 ? "#fff5cd" : "#f7f4ec";
+
+        if (t < 0.38) {
+          return cylinderPoint(
+            seed,
+            unit * 0.23,
+            unit * 0.14,
+            unit * 0.035,
+            unit * 0.19,
+            bodyRed,
+          );
+        }
+
+        if (t < 0.62) {
+          return cylinderPoint(
+            seed,
+            unit * 0.165,
+            unit * 0.105,
+            -unit * 0.125,
+            unit * 0.025,
+            index % 3 === 0 ? "#f0d47b" : "#d65b54",
+          );
+        }
+
+        if (t < 0.78) {
+          const local = (t - 0.62) / 0.16;
+          const ring = Math.floor(local * 3);
+          const ringLocal = local * 3 - ring;
+          const angle = index * goldenAngle;
+          const radiusX =
+            ring === 0 ? unit * 0.245 : ring === 1 ? unit * 0.18 : unit * 0.14;
+          const radiusZ =
+            ring === 0 ? unit * 0.15 : ring === 1 ? unit * 0.112 : unit * 0.085;
+          const y = ring === 0 ? unit * 0.025 : ring === 1 ? -unit * 0.13 : -unit * 0.16;
+          return {
+            x: Math.cos(angle) * radiusX,
+            y: y + Math.sin(ringLocal * Math.PI * 8 + index * 0.17) * unit * 0.014,
+            z: Math.sin(angle) * radiusZ,
+            color: cream,
+            size: 1.15 + pseudo(seed + 4) * 1.45,
+          };
+        }
+
+        if (t < 0.92) {
+          const local = (t - 0.78) / 0.14;
+          const candle = Math.floor(local * 5);
+          const candleLocal = local * 5 - candle;
+          const angle = candleLocal * tau * 5 + index * 0.31;
+          const centerX = (candle - 2) * unit * 0.055;
+          const centerZ = (pseudo(candle + 41) - 0.5) * unit * 0.045;
+          return {
+            x: centerX + Math.cos(angle) * unit * 0.01,
+            y: -unit * 0.155 - pseudo(seed + 7) * unit * 0.1,
+            z: centerZ + Math.sin(angle) * unit * 0.01,
+            color: candle % 2 === 0 ? "#7f9cff" : "#4fa38b",
+            size: 0.85 + pseudo(seed + 8) * 1.05,
+          };
+        }
+
+        const local = (t - 0.92) / 0.08;
+        const candle = Math.floor(local * 5);
+        const flameLocal = local * 5 - candle;
+        const angle = flameLocal * tau * 4 + index * 0.53;
+        const centerX = (candle - 2) * unit * 0.055;
+        const centerZ = (pseudo(candle + 41) - 0.5) * unit * 0.045;
+        return {
+          x: centerX + Math.cos(angle) * unit * 0.018 * pseudo(seed + 10),
+          y: -unit * 0.27 + Math.sin(flameLocal * Math.PI) * -unit * 0.025,
+          z: centerZ + Math.sin(angle) * unit * 0.012,
+          color: index % 2 === 0 ? "#fff0a6" : "#f0d47b",
+          size: 1.15 + pseudo(seed + 12) * 1.9,
+        };
+      }
+
+      function starPoint(index, total) {
+        const t = index / total;
+        const seed = index + 101;
+        if (t < 0.72) {
+          const radius = unit * (0.06 + Math.sqrt(pseudo(seed)) * 0.46);
+          const angle = index * goldenAngle;
+          const arm = 1 + Math.sin(index * 0.026) * 0.22;
+          return {
+            x: Math.cos(angle) * radius * arm,
+            y:
+              (pseudo(seed + 1) - 0.5) * unit * 0.38 +
+              Math.sin(angle * 1.8) * unit * 0.038,
+            z: Math.sin(angle) * radius * 0.92,
+            color:
+              index % 5 === 0
+                ? "#fff5cd"
+                : index % 5 === 1
+                  ? "#7f9cff"
+                  : index % 5 === 2
+                    ? "#4fa38b"
+                    : "#f0d47b",
+            size: 0.75 + pseudo(seed + 2) * 1.7,
+          };
+        }
+
+        const x = (pseudo(seed + 4) - 0.5) * unit * 0.95;
+        const z = (pseudo(seed + 5) - 0.5) * unit * 0.62;
+        return {
+          x,
+          y: unit * 0.2 + Math.sin(x * 0.021 + z * 0.015 + index * 0.03) * unit * 0.035,
+          z,
+          color: index % 3 === 0 ? "#b8fff0" : index % 3 === 1 ? "#7f9cff" : "#f7f4ec",
+          size: 0.65 + pseudo(seed + 6) * 1.35,
+        };
+      }
+
+      function assignTargets() {
+        particles.forEach((particle, index) => {
+          const point =
+            mode === "cake"
+              ? cakePoint(index, particles.length)
+              : starPoint(index, particles.length);
+          particle.tx = point.x;
+          particle.ty = point.y;
+          particle.tz = point.z;
+          particle.color = point.color;
+          particle.targetSize = point.size;
+        });
+      }
+
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        width = rect.width;
+        height = rect.height;
+        unit = Math.min(width, height);
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        if (!initialized) {
+          particles.forEach((particle, index) => {
+            particle.x = (pseudo(index + 200) - 0.5) * unit;
+            particle.y = (pseudo(index + 201) - 0.5) * unit;
+            particle.z = (pseudo(index + 202) - 0.5) * unit;
+          });
+          initialized = true;
+        }
+        assignTargets();
+        if (prefersReducedMotion || previewStill) {
+          particles.forEach((particle) => {
+            particle.x = particle.tx;
+            particle.y = particle.ty;
+            particle.z = particle.tz;
+          });
+        }
+      }
+
+      function project(x, y, z, rotationX, rotationY, sceneScale) {
+        const scaledX = x * sceneScale;
+        const scaledY = y * sceneScale;
+        const scaledZ = z * sceneScale;
+        const cosY = Math.cos(rotationY);
+        const sinY = Math.sin(rotationY);
+        const x1 = scaledX * cosY - scaledZ * sinY;
+        const z1 = scaledX * sinY + scaledZ * cosY;
+        const cosX = Math.cos(rotationX);
+        const sinX = Math.sin(rotationX);
+        const y1 = scaledY * cosX - z1 * sinX;
+        const z2 = scaledY * sinX + z1 * cosX;
+        const fov = Math.max(520, unit * 1.05);
+        const perspective = fov / (fov + z2 + unit * 0.28);
+        return {
+          x: width * 0.5 + x1 * perspective,
+          y: height * (width < 700 ? 0.66 : 0.68) + y1 * perspective,
+          scale: perspective,
+          depth: z2,
+        };
+      }
+
+      function projectOrbitPoint(item, now = performance.now()) {
+        const orbitX = Number(item.dataset.orbitX || 0);
+        const orbitY = Number(item.dataset.orbitY || 0);
+        const orbitZ = Number(item.dataset.orbitZ || 0);
+        const seed = Number(item.dataset.orbitSeed || 1);
+        const driftX = Math.cos(now * 0.00033 + seed) * 0.035;
+        const driftY = Math.sin(now * 0.00027 + seed * 1.7) * 0.03;
+        const driftZ = Math.sin(now * 0.00031 + seed * 1.3) * 0.04;
+        const autoY = mode === "stars" ? now * 0.00012 : now * 0.000075;
+        const autoX =
+          mode === "stars"
+            ? Math.sin(now * 0.00023) * 0.08
+            : Math.sin(now * 0.00018) * 0.035;
+        return project(
+          (orbitX + driftX) * unit,
+          (orbitY + driftY) * unit,
+          (orbitZ + driftZ) * unit,
+          rotation.x + autoX,
+          rotation.y + autoY,
+          rotation.scale,
+        );
+      }
+
+      function updateOrbitObjects(now = performance.now()) {
+        const objects = starOrbit.querySelectorAll(".orbit-object");
+        objects.forEach((item) => {
+          const point = projectOrbitPoint(item, now);
+          item.style.setProperty("--orbit-x", `${point.x}px`);
+          item.style.setProperty("--orbit-y", `${point.y}px`);
+          item.style.setProperty("--orbit-scale", `${clamp(point.scale, 0.62, 1.28)}`);
+          item.style.setProperty("--orbit-opacity", `${mode === "stars" ? clamp(0.46 + point.scale * 0.48, 0.42, 1) : 0}`);
+          item.style.zIndex = `${Math.round(420 + point.depth)}`;
+        });
+      }
+
+      function normalizeWish(raw) {
+        return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 64);
+      }
+
+      function normalizeName(raw) {
+        return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 18);
+      }
+
+      function pickWishAvatar(seed) {
+        if (!wishAvatarPaths.length) return "";
+        let value = 0;
+        for (let index = 0; index < seed.length; index += 1) {
+          value = (value * 31 + seed.charCodeAt(index)) >>> 0;
+        }
+        return wishAvatarPaths[value % wishAvatarPaths.length];
+      }
+
+      function localWishPosition(index) {
+        const layer = index % 4;
+        const angle = index * goldenAngle * 1.18 + layer * 0.42;
+        const radius = 0.22 + ((index * 7) % 13) * 0.034 + layer * 0.038;
+        return {
+          x: Math.cos(angle) * radius,
+          y: -0.32 + ((index * 17) % 15) * 0.048,
+          z: Math.sin(angle) * (radius * 0.78 + layer * 0.04),
+          seed: 10 + index * 1.37,
+        };
+      }
+
+      function visibleWishCount(total, scale = rotation.targetScale) {
+        return Math.min(total, maxVisibleWishCount);
+      }
+
+      function collapseActiveWishes(except = null) {
+        wishCloud.querySelectorAll(".wish-star[data-active='true']").forEach((item) => {
+          if (item !== except) item.dataset.active = "false";
+        });
+      }
+
+      async function loadWishes() {
+        let remoteWishes = [];
+        let localWishes = [];
+        try {
+          const response = await fetch("/api/wishes", { headers: { accept: "application/json" } });
+          if (response.ok) {
+            const payload = await response.json();
+            remoteWishes = Array.isArray(payload.wishes) ? payload.wishes : [];
+          }
+        } catch (error) {
+          remoteWishes = [];
+        }
+
+        try {
+          localWishes = JSON.parse(localStorage.getItem(cardConfig.localWishStorageKey) || "[]");
+        } catch (error) {
+          localWishes = [];
+        }
+
+        const mergedWishes = [...(Array.isArray(localWishes) ? localWishes : []), ...remoteWishes]
+          .map((item, index) => ({
+            ...item,
+            avatar:
+              item.avatar && wishAvatarPaths.includes(item.avatar)
+                ? item.avatar
+                : pickWishAvatar(`${item.id || index}-${item.text || ""}`),
+            text: normalizeWish(item.text),
+            name: normalizeName(item.name),
+            id: item.id || `wish-${index}`,
+          }))
+          .filter((item) => item.text && !String(item.id).startsWith("seed-"))
+          .sort((a, b) => {
+            const timeA = Date.parse(a.createdAt || "");
+            const timeB = Date.parse(b.createdAt || "");
+            return (Number.isFinite(timeA) ? timeA : 0) - (Number.isFinite(timeB) ? timeB : 0);
+          });
+
+        wishes = Array.from(
+          mergedWishes.reduce((byId, item) => byId.set(item.id, item), new Map()).values(),
+        )
+          .slice(-storedWishLimit)
+          .map((item, index) => ({
+            ...item,
+            ...localWishPosition(index + 1),
+          }));
+        renderWishes();
+      }
+
+      async function persistWish(item, nextWishes) {
+        const savedWish = {
+          id: item.id,
+          name: item.name,
+          avatar: item.avatar,
+          text: item.text,
+          x: item.x,
+          y: item.y,
+          z: item.z,
+          seed: item.seed,
+          createdAt: item.createdAt,
+        };
+        localStorage.setItem(
+          cardConfig.localWishStorageKey,
+          JSON.stringify(
+            nextWishes
+              .filter((entry) => !String(entry.id).startsWith("seed-"))
+              .slice(-storedWishLimit),
+          ),
+        );
+        try {
+          const response = await fetch("/api/wishes", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(savedWish),
+          });
+          return response.ok;
+        } catch (error) {
+          // Static previews keep the wish locally until an API is connected.
+          return false;
+        }
+      }
+
+      function renderWishes() {
+        wishCloud.replaceChildren();
+        wishes.slice(-visibleWishCount(wishes.length)).forEach((item) => {
+          const button = document.createElement("button");
+          button.className = "orbit-object wish-star";
+          button.type = "button";
+          button.dataset.orbitId = item.id;
+          button.dataset.orbitX = item.x;
+          button.dataset.orbitY = item.y;
+          button.dataset.orbitZ = item.z;
+          button.dataset.orbitSeed = item.seed;
+          button.innerHTML = `<span class="wish-avatar"><img alt="" /></span><div class="wish-copy"><strong></strong><small></small></div>`;
+          button.querySelector("img").src = item.avatar || wishAvatarPaths[0] || "";
+          button.querySelector("strong").textContent = item.text;
+          button.querySelector("small").textContent = item.name ? `来自 ${item.name}` : "祝福";
+          button.addEventListener("click", (event) => {
+            if (mode !== "stars") return;
+            event.stopPropagation();
+            const willOpen = button.dataset.active !== "true";
+            collapseActiveWishes(button);
+            button.dataset.active = willOpen ? "true" : "false";
+          });
+          wishCloud.appendChild(button);
+        });
+        updateOrbitObjects();
+      }
+
+      function draw() {
+        const now = performance.now();
+        rotation.x += (rotation.targetX - rotation.x) * 0.055;
+        rotation.y += (rotation.targetY - rotation.y) * 0.055;
+        rotation.scale += (rotation.targetScale - rotation.scale) * 0.075;
+
+        const autoY = mode === "stars" ? now * 0.00012 : now * 0.000075;
+        const autoX =
+          mode === "stars"
+            ? Math.sin(now * 0.00023) * 0.08
+            : Math.sin(now * 0.00018) * 0.035;
+
+        ctx.clearRect(0, 0, width, height);
+        const glow = ctx.createRadialGradient(
+          width * 0.5,
+          height * 0.5,
+          20,
+          width * 0.5,
+          height * 0.58,
+          width * 0.58,
+        );
+        glow.addColorStop(
+          0,
+          mode === "cake"
+            ? "rgba(255, 224, 142, 0.18)"
+            : "rgba(127, 156, 255, 0.18)",
+        );
+        glow.addColorStop(1, "rgba(255, 244, 184, 0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, width, height);
+
+        const projected = [];
+        particles.forEach((particle) => {
+          const driftAmount = mode === "stars" ? unit * 0.014 : unit * 0.002;
+          const targetX = particle.tx + Math.cos(now * 0.00045 + particle.drift) * driftAmount;
+          const targetY = particle.ty + Math.sin(now * 0.00038 + particle.drift) * driftAmount;
+          const targetZ =
+            particle.tz + Math.cos(now * 0.00034 + particle.drift * 1.7) * driftAmount;
+          const pull = mode === "stars" ? 0.014 : 0.022;
+
+          particle.vx += (targetX - particle.x) * pull;
+          particle.vy += (targetY - particle.y) * pull;
+          particle.vz += (targetZ - particle.z) * pull;
+          particle.vx *= 0.84;
+          particle.vy *= 0.84;
+          particle.vz *= 0.84;
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          particle.z += particle.vz;
+          particle.size += (particle.targetSize - particle.size) * 0.08;
+
+          const screen = project(
+            particle.x,
+            particle.y,
+            particle.z,
+            rotation.x + autoX,
+            rotation.y + autoY,
+            rotation.scale,
+          );
+          projected.push({
+            ...screen,
+            particle,
+            alpha: mode === "stars" ? 0.34 + screen.scale * 0.42 : 0.62 + screen.scale * 0.24,
+          });
+        });
+
+        projected.sort((a, b) => b.depth - a.depth);
+
+        if (mode === "stars") {
+          ctx.save();
+          ctx.globalAlpha = 0.16;
+          ctx.strokeStyle = "rgba(184, 255, 240, 0.48)";
+          ctx.lineWidth = 0.6;
+          for (let i = 0; i < projected.length - 28; i += 26) {
+            const a = projected[i];
+            const b = projected[i + 18];
+            const distance = Math.hypot(a.x - b.x, a.y - b.y);
+            if (distance < unit * 0.16) {
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y);
+              ctx.lineTo(b.x, b.y);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        projected.forEach(({ x, y, scale, particle, alpha }) => {
+          const radius = Math.max(0.65, particle.size * scale * (mode === "cake" ? 1.82 : 1.22));
+          ctx.beginPath();
+          ctx.globalAlpha = clamp(alpha, 0.26, mode === "cake" ? 0.98 : 0.84);
+          ctx.shadowBlur = mode === "cake" ? 16 : 13;
+          ctx.shadowColor = particle.color;
+          ctx.fillStyle = particle.color;
+          ctx.arc(x, y, radius, 0, tau);
+          ctx.fill();
+        });
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        updateOrbitObjects(now);
+
+        if (!prefersReducedMotion && !previewStill) {
+          requestAnimationFrame(draw);
+        }
+      }
+
+      function setMode(nextMode) {
+        mode = nextMode;
+        canvas.dataset.mode = mode;
+        stage.dataset.mode = mode;
+        starOrbit.dataset.mode = mode;
+        starOrbit.setAttribute("aria-hidden", mode === "stars" ? "false" : "true");
+        if (mode !== "stars") collapseActiveWishes();
+        assignTargets();
+      }
+
+      function activateStageTap() {
+        const now = performance.now();
+        if (now - drag.lastTapAt < 320) return;
+        drag.lastTapAt = now;
+        if (mode === "cake") {
+          setMode("stars");
+        } else {
+          setMode("cake");
+        }
+      }
+
+      async function releaseBlessing() {
+        const text = normalizeWish(wish.value);
+        const name = normalizeName(nickname.value);
+        if (!text) {
+          wishNote.textContent = "先写一句祝福吧";
+          wish.focus();
+          return;
+        }
+        if (text) {
+          const item = {
+            id: `wish-${Date.now().toString(36)}`,
+            name,
+            avatar: pickWishAvatar(`${name}-${text}-${Date.now()}`),
+            text,
+            ...localWishPosition(wishes.length + 1),
+            createdAt: new Date().toISOString(),
+          };
+          wishes = [...wishes, item]
+            .slice(-storedWishLimit)
+            .map((entry, index) => ({
+              ...entry,
+              ...localWishPosition(index + 1),
+            }));
+          renderWishes();
+          const savedOnline = await persistWish(item, wishes);
+          nickname.value = "";
+          wish.value = "";
+          wishNote.textContent = savedOnline ? "已留在星海里" : "已暂存在这台设备上";
+        }
+        setMode("stars");
+        stage.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+
+      function zoomScene(direction) {
+        rotation.targetScale = clamp(
+          rotation.targetScale + (direction === "in" ? 0.12 : -0.12),
+          0.72,
+          1.5,
+        );
+        renderWishes();
+      }
+
+      function renderAmbientMusic() {
+        if (!soundToggle || !ambientAudio) return;
+
+        const isPlaying = isAmbientMusicOn && !ambientAudio.paused;
+        soundToggle.classList.toggle("is-active", isPlaying);
+        soundToggle.setAttribute("aria-pressed", String(isPlaying));
+        soundToggle.setAttribute("aria-label", isPlaying ? "暂停背景音乐" : "播放背景音乐");
+      }
+
+      function bindAutoplayRetry() {
+        if (hasAutoplayRetryBound) return;
+
+        hasAutoplayRetryBound = true;
+        const retryPlayback = (event) => {
+          if (event?.target?.closest?.("#sound-toggle")) return;
+          hasAutoplayRetryBound = false;
+          playAmbientMusic();
+        };
+
+        document.addEventListener("pointerdown", retryPlayback, { once: true, passive: true });
+        document.addEventListener("keydown", retryPlayback, { once: true });
+        document.addEventListener("touchstart", retryPlayback, { once: true, passive: true });
+      }
+
+      async function playAmbientMusic() {
+        if (!ambientAudio) return false;
+
+        isAmbientMusicOn = true;
+        ambientAudio.loop = true;
+        ambientAudio.volume = 0.62;
+
+        try {
+          await ambientAudio.play();
+          renderAmbientMusic();
+          return true;
+        } catch (error) {
+          renderAmbientMusic();
+          bindAutoplayRetry();
+          return false;
+        }
+      }
+
+      function pauseAmbientMusic() {
+        if (!ambientAudio) return;
+
+        isAmbientMusicOn = false;
+        ambientAudio.pause();
+        renderAmbientMusic();
+      }
+
+      function toggleAmbientMusic(event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        if (!ambientAudio) return;
+
+        if (!ambientAudio.paused && isAmbientMusicOn) {
+          pauseAmbientMusic();
+          return;
+        }
+
+        playAmbientMusic();
+      }
+
+      page.addEventListener("pointermove", (event) => {
+        const rect = page.getBoundingClientRect();
+        page.style.setProperty("--pointer-x", `${event.clientX - rect.left}px`);
+        page.style.setProperty("--pointer-y", `${event.clientY - rect.top}px`);
+
+        if (!drag.active) {
+          rotation.targetY = clamp(
+            0.34 + (event.clientX / window.innerWidth - 0.5) * 0.58,
+            -1.25,
+            1.25,
+          );
+          rotation.targetX = clamp(
+            -0.18 + (event.clientY / window.innerHeight - 0.5) * -0.34,
+            -0.72,
+            0.52,
+          );
+        }
+      });
+
+      stage.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button, input, textarea") && mode === "stars") return;
+        drag.active = true;
+        drag.moved = false;
+        drag.startX = event.clientX;
+        drag.startY = event.clientY;
+        drag.startTime = performance.now();
+        drag.lastX = event.clientX;
+        drag.lastY = event.clientY;
+        drag.pointerId = event.pointerId;
+        stage.setPointerCapture(event.pointerId);
+      });
+
+      stage.addEventListener("pointermove", (event) => {
+        if (!drag.active) return;
+        const dx = event.clientX - drag.lastX;
+        const dy = event.clientY - drag.lastY;
+        if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 18) {
+          drag.moved = true;
+        }
+        drag.lastX = event.clientX;
+        drag.lastY = event.clientY;
+        rotation.targetY = clamp(rotation.targetY + dx * 0.0065, -1.65, 1.65);
+        rotation.targetX = clamp(rotation.targetX + dy * 0.0045, -0.85, 0.72);
+      });
+
+      function endDrag(event) {
+        if (!drag.active) return;
+        const distance = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        const elapsed = performance.now() - drag.startTime;
+        const wasTap = !drag.moved && distance < 28 && elapsed < 650;
+        drag.active = false;
+        if (stage.hasPointerCapture(drag.pointerId)) {
+          stage.releasePointerCapture(drag.pointerId);
+        }
+        drag.pointerId = -1;
+        if (wasTap) {
+          drag.suppressClick = true;
+          activateStageTap();
+        }
+      }
+
+      stage.addEventListener("pointerup", endDrag);
+      stage.addEventListener("pointercancel", () => {
+        drag.active = false;
+        drag.pointerId = -1;
+      });
+      stage.addEventListener("click", (event) => {
+        if (event.target.closest("button, input, textarea") && mode === "stars") return;
+        if (drag.suppressClick) {
+          drag.suppressClick = false;
+          return;
+        }
+        if (drag.moved) return;
+        if (mode === "stars") collapseActiveWishes();
+        activateStageTap();
+      });
+      stage.addEventListener(
+        "wheel",
+        (event) => {
+          event.preventDefault();
+          rotation.targetScale = clamp(
+            rotation.targetScale + (event.deltaY < 0 ? 0.08 : -0.08),
+            0.72,
+            1.5,
+          );
+          renderWishes();
+        },
+        { passive: false },
+      );
+
+      wishForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        releaseBlessing();
+      });
+      soundToggle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+      });
+      soundToggle.addEventListener("click", toggleAmbientMusic);
+      ambientAudio.addEventListener("play", renderAmbientMusic);
+      ambientAudio.addEventListener("pause", renderAmbientMusic);
+      ambientAudio.addEventListener("ended", () => {
+        if (isAmbientMusicOn) {
+          playAmbientMusic();
+        }
+      });
+      window.addEventListener("resize", resize);
+      renderAmbientMusic();
+      playAmbientMusic();
+      resize();
+      loadWishes();
+      draw();
+    </script>
+  </body>
+</html>
