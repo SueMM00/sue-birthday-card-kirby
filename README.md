@@ -30,7 +30,7 @@ const cardConfig = {
 如果你想显示成多个人名，比如：
 
 ```js
-celebrantNames: ["DINO", "FUYE", "FREDY"]
+celebrantNames: ["RONALDO", "MESSI", "NEYMAR"]
 ```
 
 页面顶部和中间标题会自动同步更新。
